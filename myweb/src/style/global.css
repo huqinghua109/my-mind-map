@@ -1,0 +1,66 @@
+:root {
+  --primary: #4f7cff;
+  --primary-light: #eef3ff;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --border: #e8ebf2;
+  --text-1: #1f2937;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(31, 41, 55, 0.06);
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+.page { min-height: 100vh; }
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: opacity .2s;
+}
+.btn-primary:hover { opacity: .9; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 覆盖 element-plus 主色 */
+.el-button--primary {
+  --el-button-bg-color: var(--primary);
+  --el-button-border-color: var(--primary);
+  --el-button-hover-bg-color: #3d6bf0;
+  --el-button-hover-border-color: #3d6bf0;
+}
+
+/* simple-mind-map 富文本节点内部是 <p>，浏览器默认 margin（1em）会把文字顶出
+   foreignObject 的可视区，导致节点文字只露出一条细线甚至看不见 */
+.smm-richtext-node-wrap,
+.smm-richtext-node-wrap p {
+  margin: 0;
+  padding: 0;
+}
+
+.flex { display: flex; }
+.flex-1 { flex: 1; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.mt-12 { margin-top: 12px; }
+.mb-12 { margin-bottom: 12px; }
+.text-muted { color: var(--text-2); }
