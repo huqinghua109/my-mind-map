@@ -1,0 +1,45 @@
+// 画布容器：所有编辑器覆盖层以它为定位上下文
+.myweb-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.myweb-canvas-wrap .mind-map-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+// 官方组件依赖的滚动条样式
+.customScrollbar {
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.25);
+  }
+
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}
+
+// 编辑器内暗色皮肤：仅作用于画布覆盖层，不影响 myweb 主界面
+.myweb-canvas-wrap .isDark {
+  --editor-bg: #262a2e;
+  --editor-text: rgba(255, 255, 255, 0.9);
+}
+
+// 官方组件按钮文本禁止换行，避免 myweb 紧凑工具栏错位
+.myweb-canvas-wrap .toolbarBtn .text {
+  white-space: nowrap;
+}

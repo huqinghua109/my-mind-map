@@ -19,7 +19,7 @@ export default defineConfig({
       'jszip': alias('jszip'),
       'uuid': alias('uuid'),
       'quill-delta': alias('quill-delta'),
-      'deepmerge': fileURLToPath(new URL('../simple-mind-map/node_modules/deepmerge', import.meta.url)),
+      'deepmerge': fileURLToPath(new URL('./src/mindmap/shims/deepmerge.js', import.meta.url)),
       'xml-js': alias('xml-js'),
       'mdast-util-from-markdown': alias('mdast-util-from-markdown'),
       'parchment': alias('parchment'),
@@ -34,16 +34,20 @@ export default defineConfig({
     port: 5173,
     fs: { allow: [path.resolve('.'), path.resolve('../simple-mind-map')] },
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: true },
-      '/static': { target: 'http://localhost:3000', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:3000', ws: true, changeOrigin: true }
+      '/api': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/static': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/ws': { target: 'ws://127.0.0.1:3000', ws: true, changeOrigin: true }
     }
   },
   optimizeDeps: {
-    include: ['katex', 'quill', 'jszip', 'pdf-lib', '@svgdotjs/svg.js', 'eventemitter3', 'deepmerge']
+    include: ['katex', 'quill', 'jszip', 'pdf-lib', '@svgdotjs/svg.js', 'eventemitter3']
   },
   build: {
     outDir: 'dist',
-    chunkSizeWarningLimit: 2000
+    chunkSizeWarningLimit: 2000,
+    // Vite 5 默认 target 为 'modules'（ES2020），产物会保留 ?? / ?. 等语法，
+    // 旧内核浏览器（Chrome<80、Firefox<72、EdgeHTML）解析时报 Unexpected token ?。
+    // 降到 ES2018 由 esbuild 转译这些语法；IE11 仍不支持（Vue 3 依赖 Proxy + ES Module）。
+    target: 'es2018'
   }
 })

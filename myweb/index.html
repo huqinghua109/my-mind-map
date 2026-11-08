@@ -8,6 +8,40 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="browser-warning" style="display:none;max-width:720px;margin:80px auto;padding:24px 28px;border:1px solid #e4e7ed;border-radius:8px;font:14px/1.7 'Microsoft YaHei',Arial,sans-serif;color:#303133;background:#fff;">
+      <h2 style="margin:0 0 12px;font-size:18px;color:#c45656;">当前浏览器版本过低</h2>
+      <p style="margin:0 0 8px;">本系统需要支持 ES Module、Proxy 与 String.prototype.replaceAll 的浏览器。</p>
+      <p style="margin:0 0 8px;">请使用 Chrome / Edge 85 及以上（Windows Server 2012 R2 建议安装 Chrome 109 或 Edge 109）、Firefox 77+、Safari 13.1+。</p>
+      <p style="margin:0;">IE11 不受支持：Vue 3 依赖 Proxy 与 ES Module，无法通过补丁兼容。IE11 也不会执行本页的 module 脚本，因此打开时只会看到空白页，不会报语法错误。</p>
+    </div>
+    <script>
+      (function () {
+        var supported = true
+        try {
+          if (!('noModule' in document.createElement('script'))) {
+            supported = false
+          }
+        } catch (e) {
+          supported = false
+        }
+        if (typeof window.Proxy !== 'function') {
+          supported = false
+        }
+        if (typeof String.prototype.replaceAll !== 'function') {
+          supported = false
+        }
+        if (!supported) {
+          var warning = document.getElementById('browser-warning')
+          if (warning) {
+            warning.style.display = 'block'
+          }
+          var app = document.getElementById('app')
+          if (app) {
+            app.style.display = 'none'
+          }
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

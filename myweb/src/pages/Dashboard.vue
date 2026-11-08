@@ -17,7 +17,9 @@
             <div v-for="f in localFiles" :key="f.key" class="file-card card" @click="openLocal(f)">
               <div class="file-icon">🗺️</div>
               <div class="file-name" :title="f.name">{{ f.name }}</div>
-              <div class="file-meta">本地 · {{ formatTime(f.time) }}</div>
+              <div class="file-meta" :title="f.linkedFile ? '已关联：' + f.linkedFile : '修改保存在浏览器本地草稿中'">
+                本地 · {{ f.linkedFile ? '已关联本地文件' : '浏览器草稿' }} · {{ formatTime(f.time) }}
+              </div>
               <div class="file-actions">
                 <el-button size="small" text @click.stop="removeLocal(f)">删除</el-button>
               </div>
@@ -116,6 +118,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { files, teams as teamsApi } from '@/api'
+import xmind from 'simple-mind-map/src/parse/xmind.js'
+import markdown from 'simple-mind-map/src/parse/markdown.js'
+import { isFileSystemAccessSupported, saveHandleRecord } from '@/utils/localFileHandle'
 
 const router = useRouter()
 const route = useRoute()
@@ -129,6 +134,7 @@ const renameType = ref('')
 const creatingTeam = ref(false)
 const teamForm = ref({ name: '', description: '' })
 
+const pickMode = ref('import')
 const localFiles = ref([])
 const personalFiles = ref([])
 const loadingPersonal = ref(false)
@@ -156,30 +162,150 @@ function newLocal() {
   router.push('/edit?source=local&new=1')
 }
 
-function openLocalFile() {
+function stripExt(name) {
+  return name.replace(/\.(smm|json|xmind|md)$/i, '')
+}
+
+function triggerFileInput() {
   fileInput.value.value = ''
   fileInput.value.click()
 }
 
-function importFile() {
-  // 复用文件选择，导入后在编辑页处理
-  router.push('/edit?source=local&import=1')
+function openLocalFile() {
+  if (!isFileSystemAccessSupported()) {
+    pickMode.value = 'open'
+    ElMessage.warning('当前环境不支持自动写回本地文件（需要 HTTPS 或 localhost）。将以浏览器本地草稿打开，修改可通过导出下载保存。')
+    triggerFileInput()
+    return
+  }
+  pickLocalFileWithHandle()
 }
 
-function onPickFile(e) {
+// 使用 File System Access API 直接打开本地文件，并持久化文件句柄以便自动写回
+async function pickLocalFileWithHandle() {
+  let handle = null
+  try {
+    const handles = await window.showOpenFilePicker({
+      types: [
+        {
+          description: '思维导图文件',
+          accept: {
+            'application/json': ['.smm', '.json']
+          }
+        }
+      ],
+      excludeAcceptAllOption: true,
+      multiple: false
+    })
+    handle = handles && handles[0]
+  } catch (error) {
+    if (error && error.name === 'AbortError') return
+    ElMessage.error('打开本地文件失败：' + ((error && error.message) || '请重试'))
+    return
+  }
+  if (!handle) return
+  try {
+    const file = await handle.getFile()
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
+    if (ext !== 'smm' && ext !== 'json') {
+      throw new Error('请选择 .smm 或 .json 思维导图文件')
+    }
+    const parsed = JSON.parse(await file.text())
+    const data = parsed && parsed.root ? parsed.root : parsed
+    if (!data || typeof data !== 'object') {
+      throw new Error('文件内容为空或无法解析')
+    }
+    const key = 'local_' + Date.now()
+    const content = JSON.stringify(data)
+    sessionStorage.setItem('mindmap_open_' + key, content)
+    localStorage.setItem('mindmap_snapshot_' + key, content)
+    let linked = true
+    try {
+      await saveHandleRecord(key, handle, file.name)
+    } catch (error) {
+      linked = false
+    }
+    localFiles.value.unshift({
+      key,
+      name: stripExt(file.name),
+      time: Date.now(),
+      linkedFile: linked ? file.name : null
+    })
+    saveLocal()
+    router.push('/edit?source=local&key=' + key)
+    if (linked) ElMessage.success('已打开本地文件，编辑将自动写回')
+    else ElMessage.warning('已打开文件，但浏览器无法保存文件句柄，刷新后需要重新关联')
+  } catch (error) {
+    ElMessage.error('打开本地文件失败：' + ((error && error.message) || '请重试'))
+  }
+}
+
+function importFile() {
+  pickMode.value = 'import'
+  triggerFileInput()
+}
+
+function readFile(file, asBuffer) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
+    if (asBuffer) reader.readAsArrayBuffer(file)
+    else reader.readAsText(file)
+  })
+}
+
+async function onPickFile(e) {
   const f = e.target.files[0]
   if (!f) return
-  const key = 'local_' + Date.now()
-  const item = { key, name: f.name, time: Date.now(), handle: null }
-  // 读取内容存到 sessionStorage 供编辑页使用
-  const reader = new FileReader()
-  reader.onload = () => {
-    sessionStorage.setItem('mindmap_open_' + key, reader.result)
+  const ext = (f.name.split('.').pop() || '').toLowerCase()
+  const mode = pickMode.value
+  if (mode === 'open' && ext !== 'smm' && ext !== 'json') {
+    ElMessage.warning('请选择 .smm 或 .json 思维导图文件')
+    return
+  }
+  try {
+    let data
+    if (ext === 'xmind') {
+      data = await xmind.parseXmindFile(await readFile(f, true), content => {
+        if (Array.isArray(content) && content.length > 1) {
+          ElMessage.info('该 XMind 文件包含多个画布，已取第一个导入')
+        }
+        return Array.isArray(content) ? content[0] : content
+      })
+    } else if (ext === 'md') {
+      data = markdown.transformMarkdownTo(await readFile(f, false))
+    } else if (ext === 'smm' || ext === 'json') {
+      const parsed = JSON.parse(await readFile(f, false))
+      data = parsed && parsed.root ? parsed.root : parsed
+    } else {
+      throw new Error('不支持的文件格式')
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('文件内容为空或无法解析')
+    }
+    const key = 'local_' + Date.now()
+    const item = {
+      key,
+      name: stripExt(f.name),
+      time: Date.now(),
+      linkedFile: null
+    }
+    // 导入内容作为一份新的本地文档，编辑页只负责打开，不再提供导入入口
+    const content = JSON.stringify(data)
+    sessionStorage.setItem('mindmap_open_' + key, content)
+    localStorage.setItem('mindmap_snapshot_' + key, content)
     localFiles.value.unshift(item)
     saveLocal()
     router.push('/edit?source=local&key=' + key)
+    if (mode === 'open') {
+      ElMessage.success('已作为浏览器本地草稿打开')
+    } else {
+      ElMessage.success('导入成功，可在编辑页点击「另存为本地文件」关联到真实文件')
+    }
+  } catch (err) {
+    ElMessage.error('导入失败：' + ((err && err.message) || '文件解析失败'))
   }
-  reader.readAsText(f)
 }
 
 function openLocal(f) {
@@ -202,12 +328,20 @@ async function loadPersonal() {
 }
 
 async function newPersonal() {
-  const { value } = await ElMessageBox.prompt('请输入文档名称', '新建云文档', { inputValue: '未命名思维导图' })
-  if (!value) return
+  let value = ''
+  try {
+    const res = await ElMessageBox.prompt('请输入文档名称', '新建云文档', { inputValue: '未命名思维导图' })
+    value = res.value
+  } catch (e) {
+    return
+  }
+  if (!value) {
+    return
+  }
   const res = await files.createPersonal({ name: value, content: '' })
   ElMessage.success('创建成功')
   personalFiles.value.unshift(res.data.file)
-  openCloud(res.data.file, 'personal')
+  router.push(`/edit?source=personal&file=${res.data.file.id}`)
 }
 
 function renamePersonal(f) {
@@ -268,12 +402,20 @@ async function createTeam() {
 }
 
 async function newTeamFile() {
-  const { value } = await ElMessageBox.prompt('请输入文档名称', '新建团队文档', { inputValue: '未命名思维导图' })
-  if (!value) return
+  let value = ''
+  try {
+    const res = await ElMessageBox.prompt('请输入文档名称', '新建团队文档', { inputValue: '未命名思维导图' })
+    value = res.value
+  } catch (e) {
+    return
+  }
+  if (!value) {
+    return
+  }
   const res = await teamsApi.createFile(selectedTeamId.value, { name: value, content: '' })
   ElMessage.success('创建成功')
   teamFiles.value.unshift(res.data.file)
-  openCloud(res.data.file, 'team')
+  router.push(`/edit?source=team&file=${res.data.file.id}`)
 }
 
 async function deleteTeamFile(f) {

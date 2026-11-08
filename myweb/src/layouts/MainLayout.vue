@@ -6,7 +6,6 @@
         <nav class="nav-links">
           <router-link to="/dashboard" class="nav-link">工作台</router-link>
           <router-link to="/teams" class="nav-link">团队</router-link>
-          <router-link to="/ai-config" class="nav-link">AI 配置</router-link>
         </nav>
       </div>
       <div class="nav-right">
@@ -18,6 +17,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人资料</el-dropdown-item>
+              <el-dropdown-item command="ai">AI 配置</el-dropdown-item>
               <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -45,6 +45,7 @@ const avatar = computed(() => {
 
 function onCommand(cmd) {
   if (cmd === 'profile') router.push('/profile')
+  else if (cmd === 'ai') router.push({ path: '/profile', query: { tab: 'ai' } })
   else if (cmd === 'logout') {
     userStore.logout()
     router.push('/login')

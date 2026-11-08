@@ -9,7 +9,8 @@ const routes = [
   { path: '/edit', component: () => import('@/pages/Edit.vue') },
   { path: '/profile', component: () => import('@/pages/Profile.vue') },
   { path: '/teams', component: () => import('@/pages/Teams.vue') },
-  { path: '/ai-config', component: () => import('@/pages/AiConfig.vue') }
+  // 旧地址兼容：AI 配置已并入个人中心
+  { path: '/ai-config', redirect: () => ({ path: '/profile', query: { tab: 'ai' } }) }
 ]
 
 const router = createRouter({
